@@ -715,6 +715,12 @@ pub fn quit_gui() {
 }
 
 pub fn update_me() -> ResultType<()> {
+    // Safety check: Prevent update if there are active connections
+    // This protects against connection interruption during update process
+    if !crate::updater::has_no_active_conns() {
+        bail!("Cannot update while connections are active. Please close all connections before updating.");
+    }
+
     let is_installed_daemon = is_installed_daemon(false);
     let option_stop_service = "stop-service";
     let is_service_stopped = hbb_common::config::option2bool(

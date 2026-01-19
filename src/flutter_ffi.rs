@@ -2648,12 +2648,27 @@ pub fn main_set_common(_key: String, _value: String) {
                         // unreachable!()
                     }
                     #[cfg(target_os = "macos")]
-                    match crate::platform::update_to(f) {
-                        Ok(_) => {
-                            log::info!("Update successfully!");
-                        }
-                        Err(e) => {
-                            log::error!("Failed to update to new version, {}", e);
+                    {
+                        // Check for active connections before updating
+                        if !crate::updater::has_no_active_conns() {
+                            log::warn!("Update blocked: active connections detected");
+                            let data = std::collections::HashMap::from([
+                                ("name", "update-blocked".to_string()),
+                                ("error", "Cannot update while connections are active. Please close all connections first.".to_string()),
+                            ]);
+                            let _res = flutter::push_global_event(
+                                flutter::APP_TYPE_MAIN,
+                                serde_json::ser::to_string(&data).unwrap_or("".to_owned()),
+                            );
+                        } else {
+                            match crate::platform::update_to(f) {
+                                Ok(_) => {
+                                    log::info!("Update successfully!");
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to update to new version, {}", e);
+                                }
+                            }
                         }
                     }
                     fs::remove_file(f).ok();

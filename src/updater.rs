@@ -47,7 +47,7 @@ pub fn stop_auto_update() {
 }
 
 #[inline]
-fn has_no_active_conns() -> bool {
+pub fn has_no_active_conns() -> bool {
     let conns = crate::Connection::alive_conns();
     conns.is_empty() && has_no_controlling_conns()
 }
