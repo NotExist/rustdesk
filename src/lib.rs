@@ -60,6 +60,14 @@ mod whiteboard;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod updater;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod update_config;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod update_verifier;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod update_rollback;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod update_manager;
 
 mod ui_cm_interface;
 mod ui_interface;
