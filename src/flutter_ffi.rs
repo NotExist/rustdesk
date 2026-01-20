@@ -2049,6 +2049,169 @@ pub fn main_update_me() -> SyncReturn<bool> {
     SyncReturn(true)
 }
 
+// ============================================================================
+// New Update System FFI Bindings
+// ============================================================================
+
+/// Get current update state as JSON string
+pub fn main_get_update_state() -> SyncReturn<String> {
+    let state = crate::updater::get_update_state();
+    let json = serde_json::to_string(&state).unwrap_or_default();
+    SyncReturn(json)
+}
+
+/// Check for updates using new system
+pub fn main_check_for_updates() {
+    std::thread::spawn(|| {
+        match crate::updater::check_for_updates_new() {
+            Ok(Some(manifest)) => {
+                let data = serde_json::json!({
+                    "name": "update_available",
+                    "version": manifest.version,
+                    "release_notes": manifest.release_notes,
+                    "file_size": manifest.file_size,
+                    "required": manifest.required,
+                });
+                #[cfg(feature = "flutter")]
+                let _ = crate::flutter::push_global_event(
+                    crate::flutter::APP_TYPE_MAIN,
+                    serde_json::to_string(&data).unwrap_or_default(),
+                );
+            }
+            Ok(None) => {
+                let data = serde_json::json!({"name": "update_not_available"});
+                #[cfg(feature = "flutter")]
+                let _ = crate::flutter::push_global_event(
+                    crate::flutter::APP_TYPE_MAIN,
+                    serde_json::to_string(&data).unwrap_or_default(),
+                );
+            }
+            Err(e) => {
+                let data = serde_json::json!({
+                    "name": "update_check_failed",
+                    "error": e.to_string(),
+                });
+                #[cfg(feature = "flutter")]
+                let _ = crate::flutter::push_global_event(
+                    crate::flutter::APP_TYPE_MAIN,
+                    serde_json::to_string(&data).unwrap_or_default(),
+                );
+            }
+        }
+    });
+}
+
+/// Download update using new system
+pub fn main_download_update() {
+    std::thread::spawn(|| {
+        if let Err(e) = crate::updater::download_update_new() {
+            log::error!("Failed to download update: {}", e);
+            let data = serde_json::json!({
+                "name": "download_failed",
+                "error": e.to_string(),
+            });
+            #[cfg(feature = "flutter")]
+            let _ = crate::flutter::push_global_event(
+                crate::flutter::APP_TYPE_MAIN,
+                serde_json::to_string(&data).unwrap_or_default(),
+            );
+        }
+    });
+}
+
+/// Install update using new system
+pub fn main_install_update() {
+    std::thread::spawn(|| {
+        match crate::updater::install_update_new() {
+            Ok(_) => {
+                let data = serde_json::json!({"name": "update_installed"});
+                #[cfg(feature = "flutter")]
+                let _ = crate::flutter::push_global_event(
+                    crate::flutter::APP_TYPE_MAIN,
+                    serde_json::to_string(&data).unwrap_or_default(),
+                );
+            }
+            Err(e) => {
+                log::error!("Failed to install update: {}", e);
+                let data = serde_json::json!({
+                    "name": "install_failed",
+                    "error": e.to_string(),
+                });
+                #[cfg(feature = "flutter")]
+                let _ = crate::flutter::push_global_event(
+                    crate::flutter::APP_TYPE_MAIN,
+                    serde_json::to_string(&data).unwrap_or_default(),
+                );
+            }
+        }
+    });
+}
+
+/// Cancel ongoing download
+pub fn main_cancel_download() -> SyncReturn<bool> {
+    match crate::updater::cancel_download_new() {
+        Ok(_) => SyncReturn(true),
+        Err(e) => {
+            log::error!("Failed to cancel download: {}", e);
+            SyncReturn(false)
+        }
+    }
+}
+
+/// Get update configuration as JSON string
+pub fn main_get_update_config() -> SyncReturn<String> {
+    let config = crate::updater::get_update_config();
+    let json = serde_json::to_string(&config).unwrap_or_default();
+    SyncReturn(json)
+}
+
+/// Set update configuration from JSON string
+pub fn main_set_update_config(config_json: String) -> SyncReturn<bool> {
+    match serde_json::from_str::<crate::update_config::UpdateConfig>(&config_json) {
+        Ok(config) => match crate::updater::set_update_config(config) {
+            Ok(_) => SyncReturn(true),
+            Err(e) => {
+                log::error!("Failed to set update config: {}", e);
+                SyncReturn(false)
+            }
+        },
+        Err(e) => {
+            log::error!("Failed to parse update config: {}", e);
+            SyncReturn(false)
+        }
+    }
+}
+
+/// Rollback to a previous version
+pub fn main_rollback_update(backup_index: usize) {
+    std::thread::spawn(move || {
+        match crate::updater::rollback_update(backup_index) {
+            Ok(_) => {
+                let data = serde_json::json!({"name": "rollback_success"});
+                #[cfg(feature = "flutter")]
+                let _ = crate::flutter::push_global_event(
+                    crate::flutter::APP_TYPE_MAIN,
+                    serde_json::to_string(&data).unwrap_or_default(),
+                );
+            }
+            Err(e) => {
+                log::error!("Failed to rollback: {}", e);
+                let data = serde_json::json!({
+                    "name": "rollback_failed",
+                    "error": e.to_string(),
+                });
+                #[cfg(feature = "flutter")]
+                let _ = crate::flutter::push_global_event(
+                    crate::flutter::APP_TYPE_MAIN,
+                    serde_json::to_string(&data).unwrap_or_default(),
+                );
+            }
+        }
+    });
+}
+
+// ============================================================================
+
 pub fn set_cur_session_id(session_id: SessionID) {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
         set_cur_session_id_(session_id, &session.get_keyboard_mode())
