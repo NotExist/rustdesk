@@ -1,4 +1,7 @@
-use crate::{common::do_check_software_update, hbbs_http::create_http_client};
+use crate::{
+    common::do_check_software_update, hbbs_http::create_http_client, update_config::UpdateConfig,
+    update_manager::UpdateManager,
+};
 use hbb_common::{bail, config, log, ResultType};
 use std::{
     io::Write,
@@ -30,6 +33,11 @@ pub fn update_controlling_session_count(count: usize) {
 
 #[allow(dead_code)]
 pub fn start_auto_update() {
+    // Initialize new update system
+    if let Err(e) = UpdateManager::init() {
+        log::error!("Failed to initialize update manager: {}", e);
+    }
+
     let _sender = TX_MSG.lock().unwrap();
 }
 
@@ -250,4 +258,48 @@ fn update_new_version(is_msi: bool, version: &str, file_path: &PathBuf) {
 pub fn get_download_file_from_url(url: &str) -> Option<PathBuf> {
     let filename = url.split('/').last()?;
     Some(std::env::temp_dir().join(filename))
+}
+
+// ============================================================================
+// New Update System Public API
+// ============================================================================
+
+/// Get current update state (for UI display)
+pub fn get_update_state() -> crate::update_config::UpdateState {
+    UpdateManager::get_state()
+}
+
+/// Trigger manual update check (new system)
+pub fn check_for_updates_new() -> ResultType<Option<crate::update_verifier::UpdateManifest>> {
+    UpdateManager::check_for_updates()
+}
+
+/// Download update (new system)
+pub fn download_update_new() -> ResultType<()> {
+    UpdateManager::download_update()
+}
+
+/// Install downloaded update (new system)
+pub fn install_update_new() -> ResultType<()> {
+    UpdateManager::install_update()
+}
+
+/// Cancel ongoing download (new system)
+pub fn cancel_download_new() -> ResultType<()> {
+    UpdateManager::cancel_download()
+}
+
+/// Get update configuration
+pub fn get_update_config() -> UpdateConfig {
+    UpdateConfig::load()
+}
+
+/// Update configuration
+pub fn set_update_config(config: UpdateConfig) -> ResultType<()> {
+    UpdateManager::update_config(config)
+}
+
+/// Rollback to a previous version
+pub fn rollback_update(backup_index: usize) -> ResultType<()> {
+    UpdateManager::rollback_to_backup(backup_index)
 }
